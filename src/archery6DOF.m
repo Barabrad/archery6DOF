@@ -269,16 +269,16 @@ function dydt = odefun(~, y, I1, I2, I3, dir_wind, v_wind, ang_fin, ...
     dydt(2) = v(2);
     dydt(3) = v(3);
     % vdot = a, which includes drag and gravity
-    [fin_DF, fin_MC] = findFinDragFM(e, w, v, dir_wind, v_wind, ...
+    [arrow_DF, arrow_MC] = findDragFM(e, w, v, dir_wind, v_wind, ...
         ang_fin, L_fin, h_fin, N_fins, z_arrow_COM, OR_shaft, L_shaft, ...
         L_tip, rho_air);
-    dydt(4) = fin_DF(1);
-    dydt(5) = fin_DF(2);
-    dydt(6) = fin_DF(3) - g;
+    dydt(4) = arrow_DF(1);
+    dydt(5) = arrow_DF(2);
+    dydt(6) = arrow_DF(3) - g;
     % wdot requires us to solve for torques
     g_MC = findGravityM(e, g, z_arrow_COM, z_tip_COM, L_shaft, L_fin, ...
         N_fins, m_tip, m_shaft, m_fin, m_nock);
-    M = fin_MC + g_MC;
+    M = arrow_MC + g_MC;
     % Break up the Euler equations:
     % M1 = I1*wdot1 + w2*w3*(I3-I2)
     % M2 = I2*wdot2 + w1*w3*(I1-I3)
@@ -525,7 +525,12 @@ function q = rotMat2Quat(M)
 % This function finds the quaternion that represents the rotation matrix M
     % Now convert to vector-angle pair
     ang = acosd((trace(M) - 1)/2);
-    V_cross = 0.5*(M - M')/sind(ang);
+    s_ang = sind(ang);
+    if (s_ang == 0)
+        V_cross = zeros(3,3);
+    else
+        V_cross = 0.5*(M - M')/sind(ang);
+    end
     vec = [V_cross(3,2); V_cross(1,3); V_cross(2,1)];
     % Now convert to a quaternion
     q = vecAng2Quat(vec, ang);
@@ -590,7 +595,6 @@ function D = calcDrag(Cd, A, rho, v)
 % - v(i) > 0 -> D(i) < 0
 % - v(i) < 0 -> D(i) > 0
 % This way, D is easier to use in vectors
-    % Account for missing arguments
     v_mag = norm(v);
     if (v_mag == 0)
         D = zeros(size(v));
@@ -601,11 +605,11 @@ function D = calcDrag(Cd, A, rho, v)
 end
 
 
-function [fin_DF, fin_MC] = findFinDragFM(quat, omega, v_arrow, ...
+function [fin_DF, fin_MC] = findDragFM(quat, omega, v_arrow, ...
     dir_wind, v_wind, ang_fin, L_fin, h_fin, N_fins, z_COM, OR_shaft, ...
     L_shaft, L_tip, rho_air)
-% Finds the drag forces and moments (about the arrow's COM) due to the fins
-% in the inertial (F) and body-fixed (C) frames, respectively.
+% Finds the drag forces and moments (about the arrow's COM) in the
+% inertial (F) and body-fixed (C) frames, respectively.
 % In F, y is along the archer-target vector, and z is the altitude vector
 % In C, z is along the arrow shaft, and y is to the right of the arrow when
 % looking at it from the tail
@@ -651,7 +655,7 @@ function [fin_DF, fin_MC] = findFinDragFM(quat, omega, v_arrow, ...
     else
         Cd_arrow = 1.17;
         % We need the velocity of the arrow's tail
-        v_Cd_arrow = v_rel_bf + cross(omega, r_tail_COM);
+        v_Cd_arrow = dot(v_rel_bf + cross(omega, r_tail_COM), z_axis_body);
     end
     D_arrow_3 = calcDrag(Cd_arrow, cs_area_arrow, rho_air, v_Cd_arrow);
     D_arrow = [0; 0; D_arrow_3]; % Produces no moment
@@ -724,7 +728,7 @@ function [pI_vec, z_arrow_COM, z_tip_COM, m_shaft, m_nock, m_tip, ...
     W_shaft = (GPI_shaft * L_shaft)/lbf2grain; % lbf
     m_shaft = W_shaft/g_imp; % lbm
     sumRSq = OR_shaft^2 + IR_shaft^2; % in^2
-    I3_shaft = 0.5*m_shaft*(sumRSq); % lbm•in^2
+    I3_shaft = 0.5*m_shaft*sumRSq; % lbm•in^2
     I1_shaft = (m_shaft/12)*(3*sumRSq + L_shaft^2); % lbm•in^2
 
     % Nock (assumed point mass along shaft axis of symmetry)
@@ -763,7 +767,7 @@ function [pI_vec, z_arrow_COM, z_tip_COM, m_shaft, m_nock, m_tip, ...
     I1_fins = I3_fins/2; % This is how the math worked out
 
     % Assemble the arrow
-    % Find COM first (we know it's on the I3 axis, so focus only on that
+    % Find COM first (we know it's on the I3 axis, so focus only on that)
     m_fins = N_fins*m_fin;
     m_arrow = m_nock + m_fins + m_shaft + m_tip;
     L_arrow = L_shaft + L_tip_cone;
@@ -771,7 +775,7 @@ function [pI_vec, z_arrow_COM, z_tip_COM, m_shaft, m_nock, m_tip, ...
     z_tip_in_COM = L_shaft - L_tip_in/2;
     z_tip_cone_COM = L_shaft + L_tip_cone/3;
     z_arrow_COM = (m_fins*(L_fin/3) + m_shaft*(L_shaft/2) + ...
-        m_tip_in*(z_tip_in_COM) + m_tip_in*(z_tip_cone_COM))/m_arrow;
+        m_tip_in*(z_tip_in_COM) + m_tip_cone*(z_tip_cone_COM))/m_arrow;
     % Find MOIs wrt total COM
     % Since the fins are the only components with a restriction on the
     % principal axes' orientation, we can just add the moments

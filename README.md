@@ -1,10 +1,12 @@
 # archery6DOF
 My first 6-DOF simulation: an arrow fired at a target
 
+I first wrote the MATLAB version (`src/archery6DOF.m`), then got the idea to translate it to Python (`src/archery6DOF.py`). The two files are independent of each other.
+
 This simulation accounts for gravity and drag, and it allows the user to input a wind speed and direction.
 Quaternions are used to keep track of the arrow's orientation, and to simplify the body-fixed moments calculations, which introduces small errors due to the irrational numbers used in the quaternions.
 
-The input parameters are documented in archery6FOD.m. The output is the difference in coordinates from the target bulls-eye and the arrow tip upon either crossing the target's plane or hitting the ground (whichever comes first).
+The input parameters are documented in `archery6FOD.m` (and `archery6FOD.py`). The output is the difference in coordinates from the target bulls-eye and the arrow tip upon either crossing the target's plane or hitting the ground (whichever comes first).
 
 The following plots are generated:
 (See pictures of the first and last in [my portfolio](https://barabrad.github.io/portfolio/personal/archery6DOF/))
